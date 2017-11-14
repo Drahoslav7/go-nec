@@ -3,7 +3,6 @@
 package nec
 
 import (
-	"fmt"
 	"time"
 )
 /*
@@ -33,13 +32,14 @@ import (
 
 	      9 ms      |2.25|
 	1111111111111111 0000 1000...
+*/
 
- */
-
+// Base time unit in which signal level is unchanged
 const Tick = time.Millisecond * 9/16 // 562.5 us
-const MaxLength = 192 // 192 * Tick = 108 ms
+// length of signal in Ticks
+const SigLength = 192 // 192 * Tick = 108 ms
 
-var RepeatSignal = NewRepeatSignal()
+var repeatSignal = NewRepeatSignal()
 
 type Signal []bool
 
@@ -57,7 +57,7 @@ func (s Signal) String () string {
 }
 
 func newSignalBegin() Signal { // 1111111111111111 00000000
-	signal := make(Signal, 16+8, MaxLength)
+	signal := make(Signal, 16+8, SigLength)
 	for i := 0; i < 16; i++ {
 		signal[i] = true
 	}
@@ -76,13 +76,12 @@ func (s* Signal) appendByte(b byte) {
 
 func (s* Signal) enclose() Signal {
 	*s = append(*s, true)
-	*s = (*s)[0:MaxLength]
+	*s = (*s)[0:SigLength]
 	return *s
 }
 
-/**
- * Transmits signal once
- */
+
+// Transmits signal once
 func (s Signal) Transmit(f func(bool)) {
 	ticker := time.NewTicker(Tick)
 	for _, v := range []bool(s) {
@@ -92,9 +91,8 @@ func (s Signal) Transmit(f func(bool)) {
 	ticker.Stop()
 }
 
-/**
- * Transmits same signal n times
- */
+
+// Transmits same signal n times
 func (s Signal) TransmitTimes(f func(bool), n int) {
 	ticker := time.NewTicker(Tick)
 	for i := 0; i < n; i++ {
@@ -106,9 +104,8 @@ func (s Signal) TransmitTimes(f func(bool), n int) {
 	ticker.Stop()
 }
 
-/**
- * Transmit signal once with following repeat code signal n times
- */
+
+// Transmits signal once with following repeat code signal n times
 func (s Signal) TransmitRepeat(f func(bool), n int) {
 	ticker := time.NewTicker(Tick)
 	for _, v := range []bool(s) {
@@ -116,7 +113,7 @@ func (s Signal) TransmitRepeat(f func(bool), n int) {
 		<-ticker.C
 	}
 	for i := 0; i < n; i++ {
-		for _, v := range []bool(RepeatSignal) {
+		for _, v := range []bool(repeatSignal) {
 			f(v)
 			<-ticker.C
 		}
@@ -141,6 +138,8 @@ func NewRepeatSignal() Signal { // 1111111111111111 0000 1000...
 	return signal.enclose()
 }
 
+
+// Encodes addres and comand to nec signal
 func Encode(addr uint8, cmd uint8) Signal {
 	signal := newSignalBegin()
 	signal.appendByte(addr)
@@ -151,6 +150,8 @@ func Encode(addr uint8, cmd uint8) Signal {
 	return signal
 }
 
+
+// Encodes extended adress and command to nec signal
 func EncodeExt(addr uint16, cmd uint8) Signal {
 	signal := newSignalBegin()
 	signal.appendByte(byte(addr)) // low byte first
@@ -159,28 +160,4 @@ func EncodeExt(addr uint16, cmd uint8) Signal {
 	signal.appendByte(^cmd)
 	signal.enclose()
 	return signal
-}
-
-func Example() {
-	fmt.Println(Encode(0, 65))         // 44 key remote - ON
-	fmt.Println(NewSignal(0x00FF827D)) // 44 key remote - ON
-
-	fmt.Println(EncodeExt(61184, 3))   // 24 key remote - ON
-	fmt.Println(NewSignal(0x00F7C03F)) // 24 key remote - ON
-	fmt.Println(NewRepeatSignal())
-
-	connect := func(v bool){
-		if v {
-			fmt.Print(1) // imagine witing to gpio pins here
-		} else {
-			fmt.Print(0)
-		}
-	}
-	s := EncodeExt(61184, 3)
-	s.Transmit(connect)
-	fmt.Println()
-	s.TransmitTimes(connect, 4)
-	fmt.Println()
-	s.TransmitRepeat(connect, 4)
-	fmt.Println()
 }
