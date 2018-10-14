@@ -5,6 +5,7 @@ package nec
 import (
 	"time"
 )
+
 /*
 	examples of NEC protocol
 
@@ -35,15 +36,15 @@ import (
 */
 
 // Base time unit in which signal level is unchanged
-const Tick = time.Millisecond * 9/16 // 562.5 us
-// length of signal in Ticks
+const Tick = time.Millisecond * 9 / 16 // 562.5 us
+// Length of signal in Ticks
 const SigLength = 192 // 192 * Tick = 108 ms
 
 var repeatSignal = NewRepeatSignal()
 
 type Signal []bool
 
-func (s Signal) String () string {
+func (s Signal) String() string {
 	l := len([]bool(s))
 	var runes = make([]rune, l)
 	for i, bit := range []bool(s) {
@@ -64,58 +65,55 @@ func newSignalBegin() Signal { // 1111111111111111 00000000
 	return signal
 }
 
-func (s* Signal) appendByte(b byte) {
+func (s *Signal) appendByte(b byte) {
 	for i := uint(0); i < 8; i++ {
-		if b >> i & 1 == 0 { // lsb first
+		if b>>i&1 == 0 { // lsb first
 			*s = append(*s, true, false) // logic 0 => |-_|
 		} else {
-			*s = append(*s, true, false, false, false)	// logic 1 => |-___|
+			*s = append(*s, true, false, false, false) // logic 1 => |-___|
 		}
 	}
 }
 
-func (s* Signal) enclose() Signal {
+func (s *Signal) enclose() Signal {
 	*s = append(*s, true)
 	*s = (*s)[0:SigLength]
 	return *s
 }
 
-
 // Transmits signal once
 func (s Signal) Transmit(f func(bool)) {
 	ticker := time.NewTicker(Tick)
 	for _, v := range []bool(s) {
-		f(v)
 		<-ticker.C
+		f(v)
 	}
 	ticker.Stop()
 }
-
 
 // Transmits same signal n times
 func (s Signal) TransmitTimes(f func(bool), n int) {
 	ticker := time.NewTicker(Tick)
 	for i := 0; i < n; i++ {
 		for _, v := range []bool(s) {
-			f(v)
 			<-ticker.C
+			f(v)
 		}
 	}
 	ticker.Stop()
 }
 
-
 // Transmits signal once with following repeat code signal n times
 func (s Signal) TransmitRepeat(f func(bool), n int) {
 	ticker := time.NewTicker(Tick)
 	for _, v := range []bool(s) {
-		f(v)
 		<-ticker.C
+		f(v)
 	}
 	for i := 0; i < n; i++ {
 		for _, v := range []bool(repeatSignal) {
-			f(v)
 			<-ticker.C
+			f(v)
 		}
 	}
 	ticker.Stop()
@@ -124,22 +122,21 @@ func (s Signal) TransmitRepeat(f func(bool), n int) {
 func NewSignal(code uint32) Signal {
 	s := newSignalBegin()
 	for i := uint(0); i < 32; i++ { // msb first
-		if code << i & (1 << 31) == 0 {
+		if code<<i&(1<<31) == 0 {
 			s = append(s, true, false) // logic 0 => |-_|
 		} else {
-			s = append(s, true, false, false, false)	// logic 1 => |-___|
+			s = append(s, true, false, false, false) // logic 1 => |-___|
 		}
 	}
 	return s.enclose()
 }
 
 func NewRepeatSignal() Signal { // 1111111111111111 0000 1000...
-	signal := newSignalBegin()[0:16+4]
+	signal := newSignalBegin()[0 : 16+4]
 	return signal.enclose()
 }
 
-
-// Encodes addres and comand to nec signal
+// Encodes address and comand to nec signal
 func Encode(addr uint8, cmd uint8) Signal {
 	signal := newSignalBegin()
 	signal.appendByte(addr)
@@ -149,7 +146,6 @@ func Encode(addr uint8, cmd uint8) Signal {
 	signal.enclose()
 	return signal
 }
-
 
 // Encodes extended adress and command to nec signal
 func EncodeExt(addr uint16, cmd uint8) Signal {
